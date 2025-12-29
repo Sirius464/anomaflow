@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📊 Dashboard AnomaFlow</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial; margin: 20px; background: #f5f5f5; }
+        .card { background: white; padding: 20px; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn { background: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .stat { font-size: 2em; color: #007bff; }
+        .nav { background: #343a40; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+        .nav a { color: white; margin: 0 10px; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/app-simple">📊 Dashboard</a>
+        <a href="/docs">📖 API Docs</a>
+        <a href="/login">🔐 Connexion</a>
+    </div>
+    
+    <h1>🔍 AnomaFlow Dashboard</h1>
+    
+    <div class="card">
+        <h2>👤 Votre session</h2>
+        <div id="userInfo">Chargement...</div>
+    </div>
+    
+    <div class="card">
+        <h2>📤 Analyser un fichier CSV</h2>
+        <input type="file" id="csvFile" accept=".csv">
+        <button class="btn" onclick="uploadFile()">📊 Analyser</button>
+        <div id="uploadResult"></div>
+    </div>
+    
+    <div class="card">
+        <h2>📈 Vos statistiques</h2>
+        <div id="stats">
+            <p>Chargement des données...</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>📋 Derniers rapports</h2>
+        <div id="reports"></div>
+    </div>
+    
+    <script>
+        // Récupérer le token depuis localStorage
+        const token = localStorage.getItem('anomaflow_token');
+        const userEmail = localStorage.getItem('anomaflow_email');
+        
+        if (!token) {
+            // Pas connecté, rediriger vers login
+            window.location.href = '/login';
+        } else {
+            // Afficher l'email de l'utilisateur
+            document.getElementById('userInfo').innerHTML = 
+                `<p>✅ Connecté en tant que : <strong>${userEmail || 'Utilisateur'}</strong></p>
+                 <p><button class="btn" onclick="logout()" style="background: #dc3545;">🚪 Déconnexion</button></p>`;
+        }
+        
+        // Charger les données du dashboard
+        async function loadDashboard() {
+            if (!token) return;
+            
+            try {
+                // 1. Charger les statistiques
+                const statsRes = await fetch('/dashboard', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (statsRes.ok) {
+                    const stats = await statsRes.json();
+                    document.getElementById('stats').innerHTML = `
+                        <p><span class="stat">${stats.total_files || 0}</span> fichiers</p>
+                        <p><span class="stat">${stats.total_transactions || 0}</span> transactions</p>
+                        <p><span class="stat">${stats.total_anomalies || 0}</span> anomalies</p>
+                        <p>Taux : <strong>${stats.anomaly_rate || '0%'}</strong></p>
+                    `;
+                }
+                
+                // 2. Charger les rapports
+                const reportsRes = await fetch('/reports', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (reportsRes.ok) {
+                    const reports = await reportsRes.json();
+                    if (reports.length > 0) {
+                        let html = '<ul>';
+                        reports.slice(0, 5).forEach(r => {
+                            html += `<li>${r.filename} - ${r.anomalies_count} anomalies</li>`;
+                        });
+                        html += '</ul>';
+                        document.getElementById('reports').innerHTML = html;
+                    } else {
+                        document.getElementById('reports').innerHTML = 
+                            '<p>Aucun rapport pour le moment.</p>';
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                document.getElementById('stats').innerHTML = 
+                    `<p style="color: red;">Erreur de chargement</p>`;
+            }
+        }
+        
+        // Upload de fichier
+        async function uploadFile() {
+            const fileInput = document.getElementById('csvFile');
+            if (!fileInput.files[0]) return alert('Choisissez un fichier CSV');
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                document.getElementById('uploadResult').innerHTML = '<p>⏳ Analyse en cours...</p>';
+                
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    document.getElementById('uploadResult').innerHTML = 
+                        `<p style="color: green;">✅ ${result.anomalies_detected} anomalies détectées</p>`;
+                    // Recharger les stats
+                    loadDashboard();
+                } else {
+                    const error = await response.json();
+                    document.getElementById('uploadResult').innerHTML = 
+                        `<p style="color: red;">❌ Erreur : ${error.detail || 'Erreur inconnue'}</p>`;
+                }
+            } catch (error) {
+                document.getElementById('uploadResult').innerHTML = 
+                    `<p style="color: red;">❌ Erreur : ${error}</p>`;
+            }
+        }
+        
+        // Déconnexion
+        function logout() {
+            localStorage.removeItem('anomaflow_token');
+            localStorage.removeItem('anomaflow_email');
+            window.location.href = '/login';
+        }
+        
+        // Charger les données au démarrage
+        loadDashboard();
+        
+        // Rafraîchir toutes les 30 secondes
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>

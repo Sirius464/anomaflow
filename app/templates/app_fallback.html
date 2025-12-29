@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>AnomaFlow Dashboard (Version Simple)</h2>
+    
+    <div id="content">
+        <p>Chargement depuis le token localStorage...</p>
+    </div>
+    
+    <script>
+        async function loadDashboard() {
+            const token = localStorage.getItem('anomaflow_token');
+            
+            if (!token) {
+                document.getElementById('content').innerHTML = 
+                    '<p style="color:red">❌ Non connecté. <a href="/login">Se connecter</a></p>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/dashboard', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('content').innerHTML = 
+                        `<h3>✅ Connecté : ${data.user_email}</h3>
+                         <p><strong>📊 Statistiques :</strong></p>
+                         <ul>
+                             <li>Fichiers analysés : ${data.total_files}</li>
+                             <li>Transactions totales : ${data.total_transactions}</li>
+                             <li>Anomalies détectées : ${data.total_anomalies}</li>
+                             <li>Taux d'anomalie : ${data.anomaly_rate}</li>
+                         </ul>
+                         <button onclick="window.location.href='/upload'">📤 Uploader un fichier</button>`;
+                } else {
+                    document.getElementById('content').innerHTML = 
+                        `<p style="color:red">❌ Token invalide. <a href="/login">Se reconnecter</a></p>`;
+                }
+            } catch (error) {
+                document.getElementById('content').innerHTML = 
+                    `<p style="color:red">Erreur : ${error.message}</p>`;
+            }
+        }
+        
+        // Charger au démarrage
+        loadDashboard();
+    </script>
+</body>
+</html>
