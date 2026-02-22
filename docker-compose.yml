@@ -1,0 +1,72 @@
+# ══════════════════════════════════════════════════════════════════
+#  AnomaFlow v2.0 — Docker Compose
+#
+#  Démarrage :
+#    Dev  : docker compose up
+#    Prod : docker compose --profile prod up -d
+# ══════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Application principale ──────────────────────────────────────
+  anomaflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: anomaflow
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      # Sécurité — OBLIGATOIRE en production
+      SECRET_KEY:                   ${SECRET_KEY:?Définissez SECRET_KEY dans .env}
+      # IA
+      GROQ_API_KEY:                 ${GROQ_API_KEY:-}
+      GROQ_MODEL:                   ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      # Application
+      DEBUG:                        ${DEBUG:-false}
+      LOG_LEVEL:                    ${LOG_LEVEL:-INFO}
+      ML_ENABLED:                   ${ML_ENABLED:-true}
+      # Base de données (volume monté)
+      DATABASE_URL:                 sqlite:////data/anomaflow.db
+      UPLOAD_DIR:                   /data/uploads
+      # Détection
+      ANOMALY_THRESHOLD_MULTIPLIER: ${ANOMALY_THRESHOLD_MULTIPLIER:-3.0}
+      MAX_TRANSACTIONS_PER_HOUR:    ${MAX_TRANSACTIONS_PER_HOUR:-10}
+    volumes:
+      - anomaflow_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Caddy (reverse proxy + HTTPS automatique) — profil prod ─────
+  caddy:
+    image: caddy:2-alpine
+    container_name: anomaflow_caddy
+    profiles: [prod]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      anomaflow:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+
+volumes:
+  anomaflow_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local

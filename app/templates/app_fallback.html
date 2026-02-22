@@ -1,51 +1,247 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnomaFlow — Mode dégradé</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0d1117; --surface: #161b22; --border: #21262d;
+      --teal:    #2dd4bf; --red: #f85149;    --yellow: #e3b341;
+      --text:    #e6edf3; --muted: #8b949e;
+      --mono:    'IBM Plex Mono', monospace;
+      --sans:    'DM Sans', sans-serif;
+    }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; padding: 2rem 1rem; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+
+    /* Header */
+    .header { display: flex; align-items: center; gap: .75rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--teal), #0ea5e9); border-radius: 6px; display: grid; place-items: center; font-family: var(--mono); font-size: 12px; font-weight: 600; color: #0d1117; }
+    .logo-text { font-family: var(--mono); font-size: 1rem; font-weight: 600; }
+    .badge-fallback { margin-left: auto; font-family: var(--mono); font-size: .65rem; background: rgba(227,179,65,.1); border: 1px solid rgba(227,179,65,.25); color: var(--yellow); padding: 2px 8px; border-radius: 3px; }
+
+    /* Alert */
+    .alert-banner { background: rgba(227,179,65,.08); border: 1px solid rgba(227,179,65,.2); border-radius: 6px; padding: .75rem 1rem; margin-bottom: 1.5rem; font-size: .8rem; color: var(--yellow); font-family: var(--mono); }
+
+    /* Section */
+    .section { background: var(--surface); border: 1px solid var(--border); border-radius: 7px; margin-bottom: 1.25rem; overflow: hidden; }
+    .section-title { padding: .8rem 1rem; font-size: .75rem; font-weight: 600; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; border-bottom: 1px solid var(--border); background: #1c2128; }
+
+    /* Upload */
+    .upload-area { padding: 1.5rem; text-align: center; }
+    .upload-zone { border: 1px dashed var(--border); border-radius: 6px; padding: 2rem; cursor: pointer; transition: border-color .2s, background .2s; position: relative; }
+    .upload-zone:hover { border-color: var(--teal); background: rgba(45,212,191,.05); }
+    .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-hint { font-size: .75rem; color: var(--muted); margin-top: .4rem; font-family: var(--mono); }
+
+    /* Bouton */
+    .btn { display: inline-block; background: var(--teal); border: none; border-radius: 5px; color: #0d1117; font-family: var(--sans); font-size: .85rem; font-weight: 600; padding: .55rem 1.2rem; cursor: pointer; transition: background .2s; margin-top: .75rem; }
+    .btn:hover { background: #5eead4; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-sec { background: #1c2128; border: 1px solid var(--border); color: var(--text); }
+    .btn-sec:hover { background: var(--surface); }
+
+    /* Résultats */
+    .results { padding: 1rem; display: none; }
+    .results.show { display: block; }
+    .stats-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .stat-pill { background: #1c2128; border: 1px solid var(--border); border-radius: 5px; padding: .5rem .85rem; font-family: var(--mono); font-size: .78rem; }
+    .stat-pill span { color: var(--teal); font-weight: 600; }
+
+    /* Table anomalies */
+    .anom-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    .anom-table th { text-align: left; padding: .5rem .75rem; font-family: var(--mono); font-size: .65rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); }
+    .anom-table td { padding: .5rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .anom-table tr:last-child td { border-bottom: none; }
+    .badge { display: inline-block; padding: 1px 7px; border-radius: 3px; font-family: var(--mono); font-size: .65rem; font-weight: 600; }
+    .badge-HIGH   { background: rgba(248,81,73,.12); color: #fca5a1; border: 1px solid rgba(248,81,73,.25); }
+    .badge-MEDIUM { background: rgba(227,179,65,.12); color: #fcd34d; border: 1px solid rgba(227,179,65,.25); }
+    .badge-LOW    { background: rgba(63,185,80,.12);  color: #86efac; border: 1px solid rgba(63,185,80,.25); }
+
+    /* Rapport IA */
+    .report-text { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: .85rem; font-family: var(--mono); font-size: .75rem; line-height: 1.7; color: var(--muted); white-space: pre-wrap; max-height: 220px; overflow-y: auto; }
+
+    /* Alert inline */
+    .inline-err { display: none; padding: .6rem .85rem; border-radius: 5px; background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.25); color: #fca5a1; font-size: .78rem; font-family: var(--mono); margin: .75rem 1rem 0; }
+    .inline-err.show { display: block; }
+
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.2); border-top-color: #0d1117; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .progress { height: 3px; background: var(--border); border-radius: 2px; margin: .75rem 0 0; display: none; }
+    .progress.show { display: block; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), #0ea5e9); width: 0%; border-radius: 2px; transition: width .3s; }
+
+    .link-dashboard { text-align: center; padding: 1.5rem; font-size: .82rem; color: var(--muted); }
+    .link-dashboard a { color: var(--teal); text-decoration: none; }
+    .link-dashboard a:hover { text-decoration: underline; }
+
+    ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
 <body>
-    <h2>AnomaFlow Dashboard (Version Simple)</h2>
-    
-    <div id="content">
-        <p>Chargement depuis le token localStorage...</p>
+<div class="wrap">
+
+  <div class="header">
+    <div class="logo-icon">AF</div>
+    <span class="logo-text">AnomaFlow</span>
+    <span class="badge-fallback">MODE DÉGRADÉ</span>
+  </div>
+
+  <div class="alert-banner">
+    ⚠ Interface simplifiée — le dashboard principal est inaccessible.
+    Fonctionnalité d'upload disponible directement ci-dessous.
+  </div>
+
+  <!-- Upload -->
+  <div class="section">
+    <div class="section-title">Analyser un fichier CSV</div>
+    <div class="upload-area">
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="file-input" accept=".csv" onchange="handleFile(event)" />
+        <div style="font-size:1.5rem;margin-bottom:.5rem">⇪</div>
+        <div style="font-size:.875rem">Déposez ou cliquez pour sélectionner un CSV</div>
+        <div class="upload-hint">transaction_id · user_id · amount · timestamp · Max 10 Mo</div>
+        <div class="progress" id="progress"><div class="progress-fill" id="progress-fill"></div></div>
+      </div>
+      <div class="inline-err" id="upload-err"></div>
     </div>
-    
-    <script>
-        async function loadDashboard() {
-            const token = localStorage.getItem('anomaflow_token');
-            
-            if (!token) {
-                document.getElementById('content').innerHTML = 
-                    '<p style="color:red">❌ Non connecté. <a href="/login">Se connecter</a></p>';
-                return;
-            }
-            
-            try {
-                const response = await fetch('/dashboard', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('content').innerHTML = 
-                        `<h3>✅ Connecté : ${data.user_email}</h3>
-                         <p><strong>📊 Statistiques :</strong></p>
-                         <ul>
-                             <li>Fichiers analysés : ${data.total_files}</li>
-                             <li>Transactions totales : ${data.total_transactions}</li>
-                             <li>Anomalies détectées : ${data.total_anomalies}</li>
-                             <li>Taux d'anomalie : ${data.anomaly_rate}</li>
-                         </ul>
-                         <button onclick="window.location.href='/upload'">📤 Uploader un fichier</button>`;
-                } else {
-                    document.getElementById('content').innerHTML = 
-                        `<p style="color:red">❌ Token invalide. <a href="/login">Se reconnecter</a></p>`;
-                }
-            } catch (error) {
-                document.getElementById('content').innerHTML = 
-                    `<p style="color:red">Erreur : ${error.message}</p>`;
-            }
-        }
-        
-        // Charger au démarrage
-        loadDashboard();
-    </script>
+  </div>
+
+  <!-- Résultats -->
+  <div class="section" id="section-results" style="display:none">
+    <div class="section-title">Résultats</div>
+    <div class="results show" id="results-area"></div>
+  </div>
+
+  <div class="link-dashboard">
+    <a href="/app">Accéder au dashboard complet →</a>
+    &nbsp;·&nbsp;
+    <a href="/login">Se connecter</a>
+  </div>
+
+</div>
+
+<script>
+  const token = sessionStorage.getItem('af_token');
+
+  // Drag & drop
+  const zone = document.getElementById('drop-zone');
+  ['dragover','dragleave','drop'].forEach(ev =>
+    zone.addEventListener(ev, e => {
+      e.preventDefault();
+      zone.style.borderColor = ev === 'dragover' ? 'var(--teal)' : '';
+      if (ev === 'drop') processFile(e.dataTransfer.files[0]);
+    })
+  );
+
+  function handleFile(e) { processFile(e.target.files[0]); }
+
+  function showErr(msg) {
+    const el = document.getElementById('upload-err');
+    el.textContent = msg;
+    el.className = 'inline-err show';
+  }
+
+  async function processFile(file) {
+    if (!file) return;
+    if (!file.name.endsWith('.csv')) return showErr('Seuls les fichiers .csv sont acceptés');
+    if (file.size > 10 * 1024 * 1024) return showErr('Fichier trop volumineux (max 10 Mo)');
+    document.getElementById('upload-err').className = 'inline-err';
+    document.getElementById('section-results').style.display = 'none';
+
+    const pb = document.getElementById('progress'), fill = document.getElementById('progress-fill');
+    pb.classList.add('show'); fill.style.width = '0%';
+    let p = 0;
+    const t = setInterval(() => { p = Math.min(p + 6, 82); fill.style.width = p + '%'; }, 200);
+
+    const form = new FormData();
+    form.append('file', file);
+
+    try {
+      const res = await fetch('/upload', {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: form,
+      });
+      clearInterval(t); fill.style.width = '100%';
+      setTimeout(() => pb.classList.remove('show'), 400);
+
+      if (res.status === 401) return showErr('Non authentifié — connectez-vous d\'abord');
+      const data = await res.json();
+      if (!res.ok) return showErr(data.detail || 'Erreur lors de l\'analyse');
+
+      renderResults(data, file.name);
+      document.getElementById('section-results').style.display = 'block';
+
+      // Charger le détail du rapport
+      if (data.file_id && token) loadDetail(data.file_id);
+
+    } catch {
+      clearInterval(t); pb.classList.remove('show');
+      showErr('Serveur inaccessible');
+    }
+    document.getElementById('file-input').value = '';
+  }
+
+  function renderResults(data, filename) {
+    const rs = data.risk_summary || {};
+    document.getElementById('results-area').innerHTML = `
+      <div class="stats-row">
+        <div class="stat-pill">Fichier : <span>${filename}</span></div>
+        <div class="stat-pill">Transactions : <span>${data.rows_processed}</span></div>
+        <div class="stat-pill">Anomalies : <span>${data.anomalies_detected}</span></div>
+        <div class="stat-pill">Risque : <span>${rs.score?.toFixed(1) ?? '—'}/100 ${rs.level ?? ''}</span></div>
+      </div>
+      <div id="detail-area" style="color:var(--muted);font-size:.78rem;font-family:var(--mono);padding:.5rem 0">
+        Chargement du rapport…
+      </div>
+    `;
+  }
+
+  async function loadDetail(id) {
+    if (!token) {
+      document.getElementById('detail-area').textContent = 'Connectez-vous pour voir le rapport complet.';
+      return;
+    }
+    try {
+      const res  = await fetch(`/reports/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) return;
+
+      const rows = (data.anomalies || []).slice(0, 10).map(a => `
+        <tr>
+          <td style="font-family:var(--mono)">${a.transaction_id}</td>
+          <td style="font-family:var(--mono)">${a.user_id}</td>
+          <td style="font-family:var(--mono)">${parseFloat(a.amount).toFixed(2)} €</td>
+          <td><span class="badge badge-${a.severity}">${a.severity}</span></td>
+          <td style="color:var(--muted);font-size:.72rem">${a.reason}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1rem">Aucune anomalie</td></tr>';
+
+      document.getElementById('detail-area').innerHTML = `
+        <div style="margin-bottom:.75rem">
+          <div style="font-size:.65rem;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Rapport IA</div>
+          <div class="report-text">${escHtml(data.summary)}</div>
+        </div>
+        <div style="font-size:.65rem;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">
+          Anomalies (${data.anomalies_count}${data.anomalies_count > 10 ? ', 10 premières affichées' : ''})
+        </div>
+        <table class="anom-table">
+          <thead><tr><th>Transaction</th><th>User</th><th>Montant</th><th>Sévérité</th><th>Raison</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch {}
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
 </body>
 </html>

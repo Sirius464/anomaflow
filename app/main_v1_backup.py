@@ -169,17 +169,17 @@ class PaginatedReports(BaseModel):
 
 @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login_v2.html", {"request": request})
 
 
 @app.get("/app", response_class=HTMLResponse, include_in_schema=False)
 async def dashboard_page(request: Request):
-    return templates.TemplateResponse("dashboard_fixed.html", {"request": request})
+    return templates.TemplateResponse("dashboard_fixed_v2.html", {"request": request})
 
 
 @app.get("/app-simple", response_class=HTMLResponse, include_in_schema=False)
 async def simple_app(request: Request):
-    return templates.TemplateResponse("app_fallback.html", {"request": request})
+    return templates.TemplateResponse("app_fallback_v2.html", {"request": request})
 
 
 # ── Routes publiques ──────────────────────────────────────────────────────────
@@ -355,9 +355,9 @@ async def upload_file(
 
     # ── Détection ─────────────────────────────────────────────────────────────
     anomalies, risk_summary = detect_anomalies(df)
-    truncated = bool(
-        len(anomalies) >= settings.MAX_ANOMALIES_RETURNED
-        and len(df) > 0
+    truncated = len(df) > 0 and (
+        risk_summary.get("by_type") and
+        sum(risk_summary["by_type"].values()) >= settings.MAX_ANOMALIES_RETURNED
     )
 
     # ── Rapport IA ────────────────────────────────────────────────────────────

@@ -1,80 +1,86 @@
-# Python
+# ══════════════════════════════════════════════════════════════════
+#  AnomaFlow v2.0 — .gitignore
+# ══════════════════════════════════════════════════════════════════
+
+# ── Secrets & Config ──────────────────────────────────────────────
+.env
+*.env
+!.env.example
+
+# ── Base de données ───────────────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*_backup_*.db
+
+# ── Uploads & Données ────────────────────────────────────────────
+uploads/
+data/
+
+# ── Python ────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+*.pyo
+*.pyd
 .Python
-build/
-develop-eggs/
+*.egg
+*.egg-info/
 dist/
-downloads/
+build/
 eggs/
-.eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
 lib/
 lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
-# Environnements virtuels
-.venv
+# ── Environnements virtuels ───────────────────────────────────────
 venv/
+.venv/
 env/
 ENV/
-env.bak/
-venv.bak/
+.env/
+.venv/
+virtualenv/
 
-# Fichiers de configuration
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# ── Tests & Coverage ─────────────────────────────────────────────
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+nosetests.xml
+*.cover
 
-# Base de données
-*.db
-*.sqlite
-*.sqlite3
-
-# Fichiers uploads (contenu seulement)
-uploads/*
-!uploads/.gitkeep
-
-# Logs
-*.log
-logs/
-
-# Backup
-*.bak
-*.backup
-
-# IDE
+# ── IDEs ──────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
+*~
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Tests
-.coverage
-.tox/
-.pytest_cache/
-.mypy_cache/
-htmlcov/
+# ── Docker ────────────────────────────────────────────────────────
+# (on commit les fichiers de config mais pas les volumes)
+docker-volumes/
 
-# Déploiement
-.dockerignore
-Dockerfile
-docker-compose.yml
+# ── Caddy ─────────────────────────────────────────────────────────
+caddy_data/
+caddy_config/
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Misc ──────────────────────────────────────────────────────────
+*.bak
+*.tmp
+.mypy_cache/
+.ruff_cache/.env
+*.db

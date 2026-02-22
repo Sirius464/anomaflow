@@ -1,121 +1,395 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-    <title>🔐 Connexion - AnomaFlow</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: Arial; margin: 20px; background: #f0f2f5; }
-        .login-box { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 5px; }
-        input { border: 1px solid #ddd; }
-        button { background: #007bff; color: white; border: none; cursor: pointer; }
-        #status { margin-top: 15px; padding: 10px; border-radius: 5px; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnomaFlow — Connexion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #21262d;
+      --border-hi: #30363d;
+      --teal:      #2dd4bf;
+      --teal-dim:  #1a7a6e;
+      --red:       #f85149;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --mono:      'IBM Plex Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Grille de fond subtile */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    /* Halo teal en haut */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px; left: 50%;
+      transform: translateX(-50%);
+      width: 600px; height: 400px;
+      background: radial-gradient(ellipse, rgba(45,212,191,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 400px;
+      position: relative;
+      z-index: 1;
+      animation: fadeUp .4s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      margin-bottom: 2rem;
+    }
+
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--teal), #0ea5e9);
+      border-radius: 6px;
+      display: grid; place-items: center;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: #0d1117;
+    }
+
+    .logo-text {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+    }
+
+    .logo-version {
+      font-family: var(--mono);
+      font-size: .65rem;
+      color: var(--teal);
+      background: rgba(45,212,191,.1);
+      border: 1px solid rgba(45,212,191,.2);
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-left: auto;
+    }
+
+    /* Onglets */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.75rem;
+      gap: .25rem;
+    }
+
+    .tab {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: var(--sans);
+      font-size: .875rem;
+      font-weight: 500;
+      padding: .5rem 1rem;
+      cursor: pointer;
+      position: relative;
+      transition: color .2s;
+    }
+
+    .tab::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 2px;
+      background: var(--teal);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+
+    .tab.active { color: var(--text); }
+    .tab.active::after { opacity: 1; }
+
+    /* Champs */
+    .field { margin-bottom: 1rem; }
+
+    label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: .4rem;
+    }
+
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border-hi);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: .875rem;
+      padding: .6rem .85rem;
+      transition: border-color .2s, box-shadow .2s;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(45,212,191,.12);
+    }
+
+    input::placeholder { color: var(--muted); opacity: .6; }
+
+    /* Bouton principal */
+    .btn-primary {
+      width: 100%;
+      background: var(--teal);
+      border: none;
+      border-radius: 5px;
+      color: #0d1117;
+      font-family: var(--sans);
+      font-size: .9rem;
+      font-weight: 600;
+      padding: .7rem;
+      cursor: pointer;
+      margin-top: 1.25rem;
+      transition: background .2s, transform .1s, opacity .2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary:hover  { background: #5eead4; }
+    .btn-primary:active { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Message d'erreur / succès */
+    .alert {
+      padding: .7rem .9rem;
+      border-radius: 5px;
+      font-size: .8rem;
+      margin-bottom: 1rem;
+      display: none;
+      font-family: var(--mono);
+    }
+
+    .alert.error   { background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.3); color: #fca5a1; }
+    .alert.success { background: rgba(45,212,191,.1); border: 1px solid rgba(45,212,191,.3); color: var(--teal); }
+    .alert.show    { display: block; animation: fadeUp .2s ease both; }
+
+    /* Panneau d'info en bas */
+    .info-bar {
+      margin-top: 1.75rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      font-size: .75rem;
+      color: var(--muted);
+      text-align: center;
+      font-family: var(--mono);
+      line-height: 1.8;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(0,0,0,.3);
+      border-top-color: #0d1117;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: .4rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
-    <div class="login-box">
-        <h2 style="text-align: center;">🔐 Connexion</h2>
-        
-        <!-- Formulaire simple -->
-        <input type="email" id="email" placeholder="Email" value="admin@anomaflow.com">
-        <input type="password" id="password" placeholder="Mot de passe" value="Admin123!">
-        <button onclick="login()">Se connecter</button>
-        
-        <!-- État de la connexion -->
-        <div id="status" class="info">
-            Prêt à vous connecter...
-        </div>
-        
-        <!-- Boutons alternatifs -->
-        <div style="margin-top: 20px; text-align: center;">
-            <p><a href="/docs" target="_blank" style="color: #007bff;">📖 Utiliser Swagger API</a></p>
-            <button onclick="openAppDirectly()" style="background: #28a745;">Ouvrir /app directement</button>
-        </div>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">AF</div>
+    <span class="logo-text">AnomaFlow</span>
+    <span class="logo-version">v2.0</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('login')">Connexion</button>
+    <button class="tab" onclick="switchTab('register')">Créer un compte</button>
+  </div>
+
+  <div id="alert" class="alert"></div>
+
+  <!-- FORMULAIRE CONNEXION -->
+  <div id="form-login">
+    <div class="field">
+      <label>Email</label>
+      <input id="login-email" type="email" placeholder="vous@exemple.com" autocomplete="email" />
     </div>
-    
-    <script>
-        // Fonction principale de connexion
-        async function login() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            // Mettre à jour le statut
-            const status = document.getElementById('status');
-            status.className = 'info';
-            status.innerHTML = '⏳ Connexion en cours...';
-            
-            try {
-                // 1. Obtenir le token
-                const loginResponse = await fetch('/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                
-                if (!loginResponse.ok) {
-                    throw new Error(`Erreur login: ${loginResponse.status}`);
-                }
-                
-                const data = await loginResponse.json();
-                const token = data.access_token;
-                
-                // 2. Sauvegarder le token dans localStorage
-                localStorage.setItem('anomaflow_token', token);
-                localStorage.setItem('anomaflow_email', email);
-                
-                status.className = 'success';
-                status.innerHTML = '✅ Token obtenu ! Redirection...';
-                
-                // 3. FORCER la redirection vers /app
-                // Cette méthode fonctionne mieux sur mobile
-                setTimeout(() => {
-                    // Méthode 1: Redirection standard
-                    window.location.href = '/app';
-                }, 1000);
-                
-            } catch (error) {
-                status.className = 'error';
-                status.innerHTML = `❌ Erreur: ${error.message}`;
-                console.error('Erreur connexion:', error);
-            }
-        }
-        
-        // Ouvrir /app directement (pour débogage)
-        function openAppDirectly() {
-            const token = localStorage.getItem('anomaflow_token');
-            if (token) {
-                window.location.href = '/app';
-            } else {
-                document.getElementById('status').className = 'error';
-                document.getElementById('status').innerHTML = '❌ Aucun token trouvé. Connectez-vous d\'abord.';
-            }
-        }
-        
-        // Au chargement de la page, vérifier si déjà connecté
-        window.onload = function() {
-            const token = localStorage.getItem('anomaflow_token');
-            const email = localStorage.getItem('anomaflow_email');
-            
-            if (token && email) {
-                document.getElementById('status').className = 'success';
-                document.getElementById('status').innerHTML = 
-                    `✅ Connecté en tant que ${email}<br>
-                     <button onclick="window.location.href='/app'" style="margin-top: 10px;">
-                        Aller au Dashboard
-                     </button>`;
-                document.getElementById('email').value = email;
-            }
-        };
-        
-        // Permettre la connexion avec la touche Entrée
-        document.getElementById('password').addEventListener('keypress', function(event) {
-            if (event.key === 'Enter') {
-                login();
-            }
-        });
-    </script>
+    <div class="field">
+      <label>Mot de passe</label>
+      <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="btn-primary" id="btn-login" onclick="doLogin()">Se connecter</button>
+  </div>
+
+  <!-- FORMULAIRE INSCRIPTION -->
+  <div id="form-register" style="display:none">
+    <div class="field">
+      <label>Nom complet</label>
+      <input id="reg-name" type="text" placeholder="Alice Dupont" />
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input id="reg-email" type="email" placeholder="vous@exemple.com" autocomplete="email" />
+    </div>
+    <div class="field">
+      <label>Mot de passe <span style="color:var(--muted);font-size:.7rem">(min. 8 caractères)</span></label>
+      <input id="reg-password" type="password" placeholder="••••••••" autocomplete="new-password" />
+    </div>
+    <button class="btn-primary" id="btn-register" onclick="doRegister()">Créer mon compte</button>
+  </div>
+
+  <div class="info-bar">
+    Détection d'anomalies transactionnelles<br>
+    Powered by Groq AI · FastAPI · SQLite
+  </div>
+</div>
+
+<script>
+  const API = '';  // même origine
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((t, i) =>
+      t.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'register'))
+    );
+    document.getElementById('form-login').style.display    = tab === 'login'    ? '' : 'none';
+    document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
+    hideAlert();
+  }
+
+  function showAlert(msg, type = 'error') {
+    const el = document.getElementById('alert');
+    el.textContent = msg;
+    el.className = `alert ${type} show`;
+  }
+
+  function hideAlert() {
+    document.getElementById('alert').className = 'alert';
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    btn.innerHTML = loading
+      ? '<span class="spinner"></span>Chargement…'
+      : btn.dataset.label;
+  }
+
+  document.getElementById('btn-login').dataset.label    = 'Se connecter';
+  document.getElementById('btn-register').dataset.label = 'Créer mon compte';
+
+  // Connexion Enter
+  ['login-email','login-password'].forEach(id =>
+    document.getElementById(id).addEventListener('keydown', e => e.key === 'Enter' && doLogin())
+  );
+  ['reg-name','reg-email','reg-password'].forEach(id =>
+    document.getElementById(id).addEventListener('keydown', e => e.key === 'Enter' && doRegister())
+  );
+
+  async function doLogin() {
+    hideAlert();
+    const email    = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    if (!email || !password) return showAlert('Remplissez tous les champs');
+
+    setLoading('btn-login', true);
+    try {
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.detail || 'Identifiants incorrects');
+
+      sessionStorage.setItem('af_token', data.access_token);
+      showAlert('Connexion réussie — redirection…', 'success');
+      setTimeout(() => window.location.href = '/app', 800);
+    } catch {
+      showAlert('Impossible de contacter le serveur');
+    } finally {
+      setLoading('btn-login', false);
+    }
+  }
+
+  async function doRegister() {
+    hideAlert();
+    const full_name = document.getElementById('reg-name').value.trim();
+    const email     = document.getElementById('reg-email').value.trim();
+    const password  = document.getElementById('reg-password').value;
+    if (!email || !password) return showAlert('Email et mot de passe requis');
+    if (password.length < 8) return showAlert('Mot de passe trop court (min. 8 caractères)');
+
+    setLoading('btn-register', true);
+    try {
+      const res = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, full_name }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showAlert(data.detail || 'Erreur lors de l\'inscription');
+
+      sessionStorage.setItem('af_token', data.access_token);
+      showAlert('Compte créé — redirection…', 'success');
+      setTimeout(() => window.location.href = '/app', 800);
+    } catch {
+      showAlert('Impossible de contacter le serveur');
+    } finally {
+      setLoading('btn-register', false);
+    }
+  }
+
+  // Redirect si déjà connecté
+  if (sessionStorage.getItem('af_token')) window.location.href = '/app';
+</script>
+
 </body>
 </html>

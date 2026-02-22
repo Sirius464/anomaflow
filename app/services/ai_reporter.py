@@ -1,124 +1,216 @@
-"""Service de génération de rapports avec IA"""
+"""
+AnomaFlow v2.0 — Service de génération de rapports IA
+Corrections & améliorations v2 :
+  - analyze_anomaly_patterns() est maintenant la fonction principale
+  - Modèle centralisé via settings.GROQ_MODEL (plus de hardcode)
+  - Retry avec backoff exponentiel sur erreur 429 / 5xx
+  - Fallback dégradé détaillé si l'IA est indisponible
+  - Score de risque intégré dans le prompt
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any
+
 import httpx
-import pandas as pd  # IMPORT AJOUTÉ
-from typing import List, Dict
+
 from app.config import settings
 
-async def generate_report(anomalies: List[Dict], total_tx: int) -> str:
-    if not settings.GROQ_API_KEY:
-        return generate_simple_report(anomalies, total_tx)
-    
-    anomaly_summary = []
-    for i, anomaly in enumerate(anomalies[:5], 1):
-        anomaly_summary.append(f"{i}. {anomaly['anomaly_type']}, {anomaly['amount']:.2f}€, {anomaly['severity']}")
-    
-    prompt = f"""Analyse : {total_tx} transactions, {len(anomalies)} anomalies.
-Top 5: {chr(10).join(anomaly_summary)}
-Génère un rapport en 3 paragraphes (250 mots) : résumé, risques, recommandations."""
+logger = logging.getLogger(__name__)
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                settings.GROQ_API_URL,
-                headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"},
-                json={"model": settings.GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 800}
-            )
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _build_prompt(
+    anomalies: list[dict],
+    total_tx: int,
+    risk_summary: dict[str, Any],
+) -> str:
+    """Construit le prompt enrichi pour l'analyse IA."""
+
+    by_type_lines = "\n".join(
+        f"  - {k}: {v} cas" for k, v in risk_summary.get("by_type", {}).items()
+    )
+    by_sev_lines = "\n".join(
+        f"  - {k}: {v}" for k, v in risk_summary.get("by_severity", {}).items()
+    )
+    top5_lines = "\n".join(
+        f"  {i+1}. [{a['severity']}] {a['anomaly_type']} — "
+        f"{a['amount']:.2f}€ (confiance {a['confidence_score']:.0%}) — {a['reason'][:80]}"
+        for i, a in enumerate(anomalies[:5])
+    )
+
+    return f"""Tu es un expert senior en détection de fraude et en conformité financière (AML/KYC).
+
+═══════════════════════════════════════════════════════
+📊 CONTEXTE DU FICHIER ANALYSÉ
+═══════════════════════════════════════════════════════
+• Transactions totales  : {total_tx}
+• Anomalies détectées   : {len(anomalies)} ({risk_summary.get('anomaly_rate', 0):.1f}%)
+• Score de risque global: {risk_summary.get('score', 0):.1f}/100 — Niveau {risk_summary.get('level', 'N/A')}
+
+📂 RÉPARTITION PAR TYPE D'ANOMALIE :
+{by_type_lines or '  (aucune)'}
+
+⚠️  RÉPARTITION PAR SÉVÉRITÉ :
+{by_sev_lines or '  (aucune)'}
+
+🔍 TOP 5 ANOMALIES LES PLUS CRITIQUES :
+{top5_lines or '  (aucune anomalie)'}
+
+═══════════════════════════════════════════════════════
+📋 TON RAPPORT DOIT COUVRIR (max 450 mots, format structuré) :
+═══════════════════════════════════════════════════════
+1. 🎯 TYPE DE RISQUE PRINCIPAL — Quel schéma de fraude ou irrégularité est le plus probable ?
+2. 📊 ÉVALUATION GLOBALE — Justifie le niveau de risque {risk_summary.get('level', '')} observé
+3. ⚡ ACTIONS IMMÉDIATES — 3 mesures prioritaires à appliquer dans les 24h
+4. 🔎 INVESTIGATIONS COMPLÉMENTAIRES — Quels patterns creuser davantage ?
+5. 🛡️  RECOMMANDATIONS PRÉVENTIVES — Comment renforcer les contrôles à long terme ?
+
+Sois précis, actionnable et concis. Évite le jargon générique."""
+
+
+async def _call_groq(prompt: str) -> str | None:
+    """
+    Appelle l'API Groq avec retry + backoff exponentiel.
+    Retourne le texte généré ou None en cas d'échec définitif.
+    """
+    headers = {
+        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": settings.GROQ_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": settings.GROQ_TEMPERATURE,
+        "max_tokens": settings.GROQ_MAX_TOKENS,
+    }
+
+    for attempt in range(1, settings.GROQ_MAX_RETRIES + 1):
+        try:
+            async with httpx.AsyncClient(timeout=settings.GROQ_TIMEOUT) as client:
+                response = await client.post(settings.GROQ_API_URL, headers=headers, json=payload)
+
             if response.status_code == 200:
                 return response.json()["choices"][0]["message"]["content"]
-            else:
-                return generate_simple_report(anomalies, total_tx)
-    except Exception:
-        return generate_simple_report(anomalies, total_tx)
 
-def generate_simple_report(anomalies: List[Dict], total_tx: int) -> str:
-    severity_counts = {}
-    for a in anomalies:
-        severity_counts[a['severity']] = severity_counts.get(a['severity'], 0) + 1
-    
-    report = f"""📊 RAPPORT - ANOMAFLOW
-Total : {total_tx} transactions
-Anomalies : {len(anomalies)} ({(len(anomalies)/total_tx*100):.2f}%)
+            if response.status_code == 429:
+                wait = 2 ** attempt
+                logger.warning("Groq rate limit — retry %d/%d dans %ds", attempt, settings.GROQ_MAX_RETRIES, wait)
+                await asyncio.sleep(wait)
+                continue
 
-🚨 SÉVÉRITÉ:
-"""
-    for sev in ['HIGH', 'MEDIUM', 'LOW']:
-        if sev in severity_counts:
-            report += f"• {sev}: {severity_counts[sev]}\n"
-    
-    report += "\n💡 Examiner les anomalies HIGH en priorité."
-    return report
+            if response.status_code >= 500:
+                wait = 2 ** attempt
+                logger.warning("Groq erreur serveur %d — retry %d/%d dans %ds", response.status_code, attempt, settings.GROQ_MAX_RETRIES, wait)
+                await asyncio.sleep(wait)
+                continue
 
-async def analyze_anomaly_patterns(anomalies: List[Dict], df: pd.DataFrame) -> str:
-    """Analyse les motifs d'anomalies avec IA (FONCTION AMÉLIORÉE)"""
-    
-    if not settings.GROQ_API_KEY or not settings.ML_ENABLED:
-        return "🔍 IA non configurée - Activez GROQ_API_KEY dans .env"
-    
-    # Préparer les données pour l'IA
-    stats = {
-        "total_transactions": len(df),
-        "anomalies_count": len(anomalies),
-        "amount_mean": f"{df['amount'].mean():.2f}€",
-        "amount_std": f"{df['amount'].std():.2f}€",
-        "amount_max": f"{df['amount'].max():.2f}€",
-        "top_users": dict(df['user_id'].value_counts().head(3))
-    }
-    
-    # Regrouper par type d'anomalie
-    anomaly_types = {}
-    for a in anomalies:
-        anomaly_types[a['anomaly_type']] = anomaly_types.get(a['anomaly_type'], 0) + 1
-    
-    prompt = f"""En tant qu'analyste financier expert, analyse ces anomalies transactionnelles :
+            logger.error("Groq erreur inattendue %d : %s", response.status_code, response.text[:200])
+            return None
 
-📈 STATISTIQUES :
-- Transactions totales : {stats['total_transactions']}
-- Anomalies détectées : {stats['anomalies_count']} ({stats['anomalies_count']/stats['total_transactions']*100:.1f}%)
-- Montant moyen : {stats['amount_mean']} (écart : {stats['amount_std']})
-- Montant maximum : {stats['amount_max']}
-- Top utilisateurs : {stats['top_users']}
+        except httpx.TimeoutException:
+            logger.warning("Groq timeout (tentative %d/%d)", attempt, settings.GROQ_MAX_RETRIES)
+            await asyncio.sleep(2 ** attempt)
+        except Exception as exc:
+            logger.error("Erreur connexion Groq : %s", exc)
+            return None
 
-🚨 RÉPARTITION DES ANOMALIES :
-{chr(10).join([f"- {k}: {v} anomalies" for k, v in anomaly_types.items()])}
+    return None
 
-🔍 TOP 5 ANOMALIES :
-{chr(10).join([f"{i+1}. {a['anomaly_type']} - {a['amount']:.2f}€ - {a['severity']} - {a['reason'][:50]}..." for i, a in enumerate(anomalies[:5])])}
 
-📋 TON ANALYSE DOIT INCLURE :
-1. 🎯 TYPE DE RISQUE PRINCIPAL : Quel type de fraude/suspicion est le plus probable ?
-2. 📊 NIVEAU DE RISQUE GLOBAL : Sur 10 (10 = critique)
-3. ⚡ ACTIONS IMMÉDIATES : 3 actions prioritaires à mener
-4. 🔎 POINTS D'INVESTIGATION : Quels éléments approfondir ?
-5. 🛡️ RECOMMANDATIONS PRÉVENTIVES : Comment éviter ces anomalies à l'avenir ?
+def _fallback_report(
+    anomalies: list[dict],
+    total_tx: int,
+    risk_summary: dict[str, Any],
+) -> str:
+    """Rapport de secours détaillé généré sans IA."""
+    sev = risk_summary.get("by_severity", {})
+    types = risk_summary.get("by_type", {})
+    rate = risk_summary.get("anomaly_rate", 0)
+    score = risk_summary.get("score", 0)
+    level = risk_summary.get("level", "N/A")
 
-Réponds de manière structurée et concise (max 400 mots)."""
-    
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                settings.GROQ_API_URL,
-                headers={
-                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.7,
-                    "max_tokens": 1200
-                }
-            )
-            
-            if response.status_code == 200:
-                return f"""🤖 ANALYSE IA - ANOMAFLOW
+    top_anomalies_block = ""
+    for i, a in enumerate(anomalies[:5], 1):
+        top_anomalies_block += (
+            f"  {i}. [{a['severity']}] {a['anomaly_type'].upper()} — "
+            f"{a['amount']:.2f}€\n"
+            f"     ↳ {a['reason']}\n"
+        )
 
-{response.json()["choices"][0]["message"]["content"]}
+    types_block = "\n".join(f"  • {k}: {v}" for k, v in types.items()) or "  • Aucune"
 
----
-📊 Métriques : {stats['anomalies_count']} anomalies sur {stats['total_transactions']} transactions
-🔔 Configurez GROQ_API_KEY dans .env pour des analyses plus détaillées"""
-            else:
-                return f"❌ Erreur API Groq : {response.status_code}"
-                
-    except Exception as e:
-        return f"⚠️ Erreur de connexion IA : {str(e)[:100]}"
+    return f"""📊 RAPPORT ANOMAFLOW v2 — MODE DÉGRADÉ (IA non disponible)
+{'═' * 55}
+
+📈 STATISTIQUES GÉNÉRALES
+  Transactions analysées : {total_tx}
+  Anomalies détectées    : {len(anomalies)} ({rate:.1f}%)
+  Score de risque        : {score:.1f}/100 — Niveau {level}
+
+⚠️  SÉVÉRITÉ DES ANOMALIES
+  🔴 HIGH   : {sev.get('HIGH', 0)}
+  🟠 MEDIUM : {sev.get('MEDIUM', 0)}
+  🟡 LOW    : {sev.get('LOW', 0)}
+
+📂 RÉPARTITION PAR TYPE
+{types_block}
+
+🔍 TOP 5 ANOMALIES CRITIQUES
+{top_anomalies_block or '  Aucune anomalie critique'}
+💡 RECOMMANDATIONS AUTOMATIQUES
+  1. Examiner en priorité les {sev.get('HIGH', 0)} anomalie(s) HIGH
+  2. Vérifier manuellement les montants quasi-ronds répétés
+  3. Activer GROQ_API_KEY dans .env pour des analyses IA approfondies
+
+{'═' * 55}
+⚙️  Configurez GROQ_API_KEY dans .env pour activer l'analyse IA complète"""
+
+
+# ── API publique ──────────────────────────────────────────────────────────────
+
+async def generate_report(
+    anomalies: list[dict],
+    total_tx: int,
+    risk_summary: dict[str, Any] | None = None,
+) -> str:
+    """
+    Point d'entrée principal.
+    Génère un rapport IA détaillé ou un rapport dégradé si l'IA est
+    indisponible.
+
+    Args:
+        anomalies:    Liste des anomalies détectées
+        total_tx:     Nombre total de transactions analysées
+        risk_summary: Dictionnaire de score de risque (compute_risk_score)
+
+    Returns:
+        Rapport textuel formaté
+    """
+    if risk_summary is None:
+        risk_summary = {
+            "score": 0, "level": "N/A",
+            "anomaly_rate": (len(anomalies) / total_tx * 100) if total_tx else 0,
+            "by_type": {}, "by_severity": {},
+        }
+
+    if not settings.GROQ_API_KEY:
+        logger.info("GROQ_API_KEY absente — rapport dégradé")
+        return _fallback_report(anomalies, total_tx, risk_summary)
+
+    prompt = _build_prompt(anomalies, total_tx, risk_summary)
+    ai_text = await _call_groq(prompt)
+
+    if ai_text:
+        return (
+            f"🤖 RAPPORT IA — ANOMAFLOW v2 | Modèle : {settings.GROQ_MODEL}\n"
+            f"{'═' * 60}\n\n"
+            f"{ai_text}\n\n"
+            f"{'─' * 60}\n"
+            f"📊 {len(anomalies)} anomalies / {total_tx} transactions "
+            f"| Risque : {risk_summary['level']} ({risk_summary['score']:.1f}/100)"
+        )
+
+    logger.warning("Toutes les tentatives Groq ont échoué — rapport dégradé")
+    return _fallback_report(anomalies, total_tx, risk_summary)
